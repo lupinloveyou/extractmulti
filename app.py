@@ -1,15 +1,16 @@
 import streamlit as st
+import zipfile
+import io
 
 def extract_accounts(lines, keywords):
     results = {kw: set() for kw in keywords}
     for line in lines:
         parts = line.strip().split(":")
         if len(parts) >= 3:
-            url = parts[0]
             tk = parts[-2]
             mk = parts[-1]
             for kw in keywords:
-                if kw.lower() in url.lower():
+                if kw.lower() in line.lower():  # check cả dòng
                     results[kw].add(f"{tk}:{mk}")
     return results
 
@@ -27,6 +28,7 @@ if uploaded_file and keywords_input:
         with st.spinner("Đang xử lý..."):
             results = extract_accounts(lines, keywords)
 
+        # Hiển thị kết quả từng từ khóa
         for kw in keywords:
             accounts = sorted(results[kw])
             st.subheader(f"Kết quả cho **{kw}** ({len(accounts)} dòng)")
@@ -39,3 +41,20 @@ if uploaded_file and keywords_input:
                 )
             else:
                 st.info(f"❌ Không tìm thấy dữ liệu cho {kw}")
+
+        # Tạo file ZIP chứa tất cả kết quả
+        if any(results[kw] for kw in keywords):
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                for kw in keywords:
+                    accounts = sorted(results[kw])
+                    if accounts:
+                        zip_file.writestr(f"{kw}_accounts.txt", "\n".join(accounts))
+            zip_buffer.seek(0)
+
+            st.download_button(
+                label="⬇️ Tải tất cả kết quả (ZIP)",
+                data=zip_buffer,
+                file_name="all_accounts.zip",
+                mime="application/zip",
+            )
